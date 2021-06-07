@@ -38,10 +38,24 @@ func createToken(c *UserClaims) (string, error) {
 	return signedToken, nil
 }
 
+// keys would be a database
+var keys = map[string][]byte{}
+
 func parseToken(signedToken string) (*UserClaims, error) {
 	token, err := jwt.ParseWithClaims(signedToken, &UserClaims{}, func(t *jwt.Token) (interface{}, error) {
 		if t.Method.Alg() == jwt.SigningMethodHS512.Alg() {
 			return nil, fmt.Errorf("invalid signing algorithm")
+		}
+
+		kid, ok := t.Header["kid"].(string)
+		if !ok {
+			return nil, fmt.Errorf("invalid key id")
+		}
+
+		// Rotating key
+		k, ok := keys[kid]
+		if !ok {
+			return nil, fmt.Errorf("invalid key id: %v", k)
 		}
 
 		return generateKey(), nil
