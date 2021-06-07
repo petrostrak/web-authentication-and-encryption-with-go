@@ -4,6 +4,7 @@ import (
 	"crypto/hmac"
 	"crypto/sha512"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
@@ -27,10 +28,31 @@ func (u *UserClaims) Valid() error {
 	return nil
 }
 
+func createToken(c *UserClaims) (string, error) {
+	token := jwt.NewWithClaims(jwt.SigningMethodHS512, c)
+	signedToken, err := token.SignedString(generateKey())
+	if err != nil {
+		return "", fmt.Errorf("error in createToken when signing token: %w", err)
+	}
+
+	return signedToken, nil
+}
+
 // JSON Web Token
 // {JWT standard fields}.{our fields}.Signature
 func main() {
+	pass := "123456789"
 
+	hashedPass, err := hashPassword(pass)
+	if err != nil {
+		panic(err)
+	}
+
+	if err := comparePassword(pass, []byte(hashedPass)); err != nil {
+		log.Fatalln("Not logged in")
+	}
+
+	fmt.Println("Logged in!")
 }
 
 func hashPassword(pwd string) ([]byte, error) {
