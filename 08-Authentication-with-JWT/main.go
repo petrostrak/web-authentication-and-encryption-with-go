@@ -9,6 +9,15 @@ import (
 	"github.com/dgrijalva/jwt-go"
 )
 
+type myClaims struct {
+	jwt.StandardClaims
+	Email string
+}
+
+const (
+	myKey = "ilovethursdayswhenitrains2much"
+)
+
 func main() {
 	http.HandleFunc("/", foo)
 	http.HandleFunc("/submit", bar)
@@ -16,13 +25,6 @@ func main() {
 }
 
 func getJWT(msg string) (string, error) {
-	myKey := "ilovethursdayswhenitrains2much"
-
-	type myClaims struct {
-		jwt.StandardClaims
-		Email string
-	}
-
 	claims := myClaims{
 		StandardClaims: jwt.StandardClaims{
 			ExpiresAt: time.Now().Add(5 * time.Minute).Unix(),
@@ -72,11 +74,23 @@ func foo(w http.ResponseWriter, r *http.Request) {
 		c = &http.Cookie{}
 	}
 
-	isEqual := true
+	ss := c.Value
+	afterVerT, err := jwt.ParseWithClaims(ss, &myClaims{}, func(beforeVerT *jwt.Token) (interface{}, error) {
+		return []byte(myKey), nil
+	})
+
+	// StandardClaims has the Valid() method which means it implements the Claims interface
+	// Where we ParseClaims as with "ParseWithClaims", the Valid() method gets run and if all
+	// is well, then returns no "error" and type TOKEN which has a field VALID will be true.
+
+	isEqual := afterVerT.Valid && err == nil
 
 	message := "Not logged in"
 	if isEqual {
 		message = "Logged in"
+		claims := afterVerT.Claims.(*myClaims)
+		fmt.Println(claims.Email)
+		fmt.Println(claims.ExpiresAt)
 	}
 
 	html := `<!DOCTYPE html>
