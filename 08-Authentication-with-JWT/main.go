@@ -83,7 +83,9 @@ func foo(w http.ResponseWriter, r *http.Request) {
 	// Where we ParseClaims as with "ParseWithClaims", the Valid() method gets run and if all
 	// is well, then returns no "error" and type TOKEN which has a field VALID will be true.
 
-	isEqual := afterVerT.Valid && err == nil
+	// First we check if there is an error and then we validate the token. The opposite would
+	// cause an error "cannot dereference from nil" because ParseWithClaims might return nil.
+	isEqual := err == nil && afterVerT.Valid
 
 	message := "Not logged in"
 	if isEqual {
