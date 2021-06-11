@@ -8,12 +8,14 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"golang.org/x/crypto/bcrypt"
 )
 
 var (
-	db = map[string][]byte{}
+	db  = map[string][]byte{}
+	key = []byte("mySecretKey")
 )
 
 func main() {
@@ -131,7 +133,6 @@ func login(w http.ResponseWriter, r *http.Request) {
 }
 
 func createToken(sid string) string {
-	key := []byte("mySecretKey")
 	mac := hmac.New(sha256.New, key)
 	mac.Write([]byte(sid))
 
@@ -142,4 +143,25 @@ func createToken(sid string) string {
 	signedMac := base64.StdEncoding.EncodeToString(mac.Sum(nil))
 
 	return signedMac + "|" + sid
+}
+
+func parseToken(ss string) (string, error) {
+	xs := strings.SplitN(ss, "|", 2)
+	if len(xs) != 2 {
+		return "", fmt.Errorf("stop hacking me")
+	}
+
+	xb, err := base64.StdEncoding.DecodeString(xs[0])
+	if err != nil {
+		return "", fmt.Errorf("couldn't parseToken decodestring %w", err)
+	}
+
+	mac := hmac.New(sha256.New, key)
+	mac.Write([]byte(xs[1]))
+
+	if !hmac.Equal(xb, mac.Sum(nil)) {
+		return "", fmt.Errorf("couldn't parseToken not equal signed and sid")
+	}
+
+	return xs[1], nil
 }
