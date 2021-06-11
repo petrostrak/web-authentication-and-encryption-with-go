@@ -16,12 +16,13 @@ var (
 func main() {
 	http.HandleFunc("/", index)
 	http.HandleFunc("/register", register)
+	http.HandleFunc("/login", login)
 	http.ListenAndServe(":8080", nil)
 }
 
 func index(w http.ResponseWriter, r *http.Request) {
 
-	errMsg := r.FormValue("errormsg")
+	msg := r.FormValue("errormsg")
 
 	html := `<!DOCTYPE html>
 	<html lang="en">
@@ -32,7 +33,8 @@ func index(w http.ResponseWriter, r *http.Request) {
 		<title>Hands on exercises</title>
 	</head>
 	<body>
-		<p>IF THERE WAS AN ERROR, HERE IT IS: ` + errMsg + `</p>
+		<p>IF THERE WAS AN ERROR, HERE IT IS: ` + msg + `</p>
+		<p>REGISTER</p>
 		<form action="/submit" method="POST">
 			<p>Email</p>
 			<input type="email" name="email"/>
@@ -40,6 +42,14 @@ func index(w http.ResponseWriter, r *http.Request) {
 			<input type="password" name="password"/>
 			<input type="submit"/>
 		</form>
+		<p>LOG IN</p>
+		<form action="/login" method="POST">
+		<p>Email</p>
+		<input type="email" name="email"/>
+		<p>Password</p>
+		<input type="password" name="password"/>
+		<input type="submit"/>
+	</form>
 	</body>
 	</html>`
 
@@ -49,21 +59,21 @@ func index(w http.ResponseWriter, r *http.Request) {
 func register(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodPost {
-		errMsg := url.QueryEscape("your methor was not post")
-		http.Redirect(w, r, "/?errormsg="+errMsg, http.StatusSeeOther)
+		msg := url.QueryEscape("your methor was not post")
+		http.Redirect(w, r, "/?errormsg="+msg, http.StatusSeeOther)
 		return
 	}
 
 	email := r.FormValue("email")
 	if email == "" {
-		errMsg := url.QueryEscape("your email needs not to be empty")
-		http.Redirect(w, r, "/?errormsg="+errMsg, http.StatusSeeOther)
+		msg := url.QueryEscape("your email needs not to be empty")
+		http.Redirect(w, r, "/?errormsg="+msg, http.StatusSeeOther)
 		return
 	}
 	pwd := r.FormValue("password")
 	if pwd == "" {
-		errMsg := url.QueryEscape("your password needs not to be empty")
-		http.Redirect(w, r, "/?errormsg="+errMsg, http.StatusSeeOther)
+		msg := url.QueryEscape("your password needs not to be empty")
+		http.Redirect(w, r, "/?errormsg="+msg, http.StatusSeeOther)
 		return
 	}
 
@@ -78,4 +88,41 @@ func register(w http.ResponseWriter, r *http.Request) {
 	db[email] = bs
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+func login(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != http.MethodPost {
+		msg := url.QueryEscape("your methor was not post")
+		http.Redirect(w, r, "/?errormsg="+msg, http.StatusSeeOther)
+		return
+	}
+
+	email := r.FormValue("email")
+	if email == "" {
+		msg := url.QueryEscape("your email needs not to be empty")
+		http.Redirect(w, r, "/?errormsg="+msg, http.StatusSeeOther)
+		return
+	}
+	pwd := r.FormValue("password")
+	if pwd == "" {
+		msg := url.QueryEscape("your password needs not to be empty")
+		http.Redirect(w, r, "/?errormsg="+msg, http.StatusSeeOther)
+		return
+	}
+
+	if _, ok := db[email]; !ok {
+		msg := url.QueryEscape("your email or password didn't match")
+		http.Redirect(w, r, "/?errormsg="+msg, http.StatusSeeOther)
+		return
+	}
+
+	if err := bcrypt.CompareHashAndPassword(db[email], []byte(pwd)); err != nil {
+		msg := url.QueryEscape("your email or password didn't match")
+		http.Redirect(w, r, "/?errormsg="+msg, http.StatusSeeOther)
+		return
+	}
+
+	msg := url.QueryEscape("you logged in " + email)
+	http.Redirect(w, r, "/?errormsg="+msg, http.StatusSeeOther)
 }
