@@ -14,8 +14,13 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+type user struct {
+	password []byte
+	First    string
+}
+
 var (
-	db       = map[string][]byte{}
+	db       = map[string]user{}
 	key      = []byte("mySecretKey")
 	sessions = map[string]string{}
 )
@@ -46,6 +51,11 @@ func index(w http.ResponseWriter, r *http.Request) {
 		email = sessions[s]
 	}
 
+	var first string
+	if user, ok := db[email]; ok {
+		first = user.First
+	}
+
 	msg := r.FormValue("errormsg")
 
 	fmt.Fprintf(w, `<!DOCTYPE html>
@@ -57,26 +67,29 @@ func index(w http.ResponseWriter, r *http.Request) {
 		<title>Hands on exercises</title>
 	</head>
 	<body>
+		<p>IF YOU HAVE A SESSION, HERE IS YOUN NAME: %s</p>
 		<p>IF YOU HAVE A SESSION, HERE IT IS: %s</p>
 		<p>IF THERE IS A MESSAGE FOR YOU, HERE IT IS: %s</p>
 		<p>REGISTER</p>
 		<form action="/submit" method="POST">
-			<p>Email</p>
-			<input type="email" name="email"/>
-			<p>Password</p>
-			<input type="password" name="password"/>
+			<label for="first">First</label>
+			<input type="text" name="first" placeholder="First"/>
+			<label for="email">Email</label>
+			<input type="email" name="email" placeholder="Email"/>
+			<label for="password">Password</label>
+			<input type="password" name="password" placeholder="Password"/>
 			<input type="submit"/>
 		</form>
 		<p>LOG IN</p>
 		<form action="/login" method="POST">
-		<p>Email</p>
-		<input type="email" name="email"/>
-		<p>Password</p>
-		<input type="password" name="password"/>
+		<label for="email">Email</label>
+		<input type="email" name="email" placeholder="Email"/>
+		<label for="password">Password</label>
+		<input type="password" name="password" placeholder="Password"/>
 		<input type="submit"/>
 	</form>
 	</body>
-	</html>`, email, msg)
+	</html>`, first, email, msg)
 }
 
 func register(w http.ResponseWriter, r *http.Request) {
@@ -93,9 +106,17 @@ func register(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/?errormsg="+msg, http.StatusSeeOther)
 		return
 	}
+
 	pwd := r.FormValue("password")
 	if pwd == "" {
 		msg := url.QueryEscape("your password needs not to be empty")
+		http.Redirect(w, r, "/?errormsg="+msg, http.StatusSeeOther)
+		return
+	}
+
+	f := r.FormValue("first")
+	if f == "" {
+		msg := url.QueryEscape("your first name needs not to be empty")
 		http.Redirect(w, r, "/?errormsg="+msg, http.StatusSeeOther)
 		return
 	}
@@ -108,7 +129,10 @@ func register(w http.ResponseWriter, r *http.Request) {
 
 	fmt.Println(email)
 	fmt.Println(bs)
-	db[email] = bs
+	db[email] = user{
+		password: bs,
+		First:    f,
+	}
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
@@ -140,7 +164,7 @@ func login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := bcrypt.CompareHashAndPassword(db[email], []byte(pwd)); err != nil {
+	if err := bcrypt.CompareHashAndPassword(db[email].password, []byte(pwd)); err != nil {
 		msg := url.QueryEscape("your email or password didn't match")
 		http.Redirect(w, r, "/?errormsg="+msg, http.StatusSeeOther)
 		return
