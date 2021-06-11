@@ -1,6 +1,9 @@
 package main
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
 	"fmt"
 	"io"
 	"net/http"
@@ -125,4 +128,18 @@ func login(w http.ResponseWriter, r *http.Request) {
 
 	msg := url.QueryEscape("you logged in " + email)
 	http.Redirect(w, r, "/?errormsg="+msg, http.StatusSeeOther)
+}
+
+func createToken(sid string) string {
+	key := []byte("mySecretKey")
+	mac := hmac.New(sha256.New, key)
+	mac.Write([]byte(sid))
+
+	// to hex
+	// signedMac := fmt.Sprintf("%x", mac.Sum(nil))
+
+	// to base64
+	signedMac := base64.StdEncoding.EncodeToString(mac.Sum(nil))
+
+	return signedMac + "|" + sid
 }
