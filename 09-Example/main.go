@@ -1,14 +1,11 @@
 package main
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
-	"encoding/base64"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
@@ -48,14 +45,14 @@ func index(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	s, err := parseToken(c.Value)
+	sID, err := parseToken(c.Value)
 	if err != nil {
 		log.Println("index parseToken", err)
 	}
 
 	var email string
-	if s != "" {
-		email = sessions[s]
+	if sID != "" {
+		email = sessions[sID]
 	}
 
 	var first string
@@ -226,23 +223,41 @@ func createToken(sid string) (string, error) {
 	// return signedMac + "|" + sid
 }
 
-func parseToken(ss string) (string, error) {
-	xs := strings.SplitN(ss, "|", 2)
-	if len(xs) != 2 {
-		return "", fmt.Errorf("stop hacking me")
-	}
+func parseToken(st string) (string, error) {
+	token, err := jwt.ParseWithClaims(st, &customClaims{}, func(t *jwt.Token) (interface{}, error) {
+		// checks the encoding algorithm of the signed token
+		if t.Method.Alg() != jwt.SigningMethodHS256.Alg() {
+			return nil, errors.New("parseWithClaims different algorithms used")
+		}
+		return key, nil
+	})
 
-	xb, err := base64.StdEncoding.DecodeString(xs[0])
 	if err != nil {
-		return "", fmt.Errorf("couldn't parseToken decodestring %w", err)
+		return "", fmt.Errorf("couldn't parseTokenWithClaims in parseToken %w", err)
 	}
 
-	mac := hmac.New(sha256.New, key)
-	mac.Write([]byte(xs[1]))
-
-	if !hmac.Equal(xb, mac.Sum(nil)) {
-		return "", fmt.Errorf("couldn't parseToken not equal signed and sid")
+	if !token.Valid {
+		return "", fmt.Errorf("token not valid in parseTokenWithClaims")
 	}
 
-	return xs[1], nil
+	return token.Claims.(*customClaims).SID, nil
+
+	// xs := strings.SplitN(st, "|", 2)
+	// if len(xs) != 2 {
+	// 	return "", fmt.Errorf("stop hacking me")
+	// }
+
+	// xb, err := base64.StdEncoding.DecodeString(xs[0])
+	// if err != nil {
+	// 	return "", fmt.Errorf("couldn't parseToken decodestring %w", err)
+	// }
+
+	// mac := hmac.New(sha256.New, key)
+	// mac.Write([]byte(xs[1]))
+
+	// if !hmac.Equal(xb, mac.Sum(nil)) {
+	// 	return "", fmt.Errorf("couldn't parseToken not equal signed and sid")
+	// }
+
+	// return xs[1], nil
 }
