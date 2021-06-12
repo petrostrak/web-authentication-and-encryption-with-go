@@ -9,7 +9,9 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
+	"github.com/dgrijalva/jwt-go"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -17,6 +19,11 @@ import (
 type user struct {
 	password []byte
 	First    string
+}
+
+type customClaims struct {
+	jwt.StandardClaims
+	SID string
 }
 
 var (
@@ -172,7 +179,13 @@ func login(w http.ResponseWriter, r *http.Request) {
 
 	sUUID := uuid.New().String()
 	sessions[sUUID] = email
-	token := createToken(sUUID)
+	token, err := createToken(sUUID)
+	if err != nil {
+		log.Println("couldn't createToken in login", err)
+		msg := url.QueryEscape("try again later")
+		http.Redirect(w, r, "/?errormsg="+msg, http.StatusSeeOther)
+		return
+	}
 
 	c := http.Cookie{
 		Name:  "sessionID",
@@ -185,17 +198,32 @@ func login(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/?errormsg="+msg, http.StatusSeeOther)
 }
 
-func createToken(sid string) string {
-	mac := hmac.New(sha256.New, key)
-	mac.Write([]byte(sid))
+func createToken(sid string) (string, error) {
+	cc := customClaims{
+		StandardClaims: jwt.StandardClaims{
+			ExpiresAt: time.Now().Add(5 * time.Minute).Unix(),
+		},
+		SID: sid,
+	}
 
-	// to hex
-	// signedMac := fmt.Sprintf("%x", mac.Sum(nil))
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, cc)
+	st, err := token.SignedString(key)
+	if err != nil {
+		return "", fmt.Errorf("couldn't sign token in createToken %w", err)
+	}
 
-	// to base64
-	signedMac := base64.StdEncoding.EncodeToString(mac.Sum(nil))
+	return st, nil
 
-	return signedMac + "|" + sid
+	// mac := hmac.New(sha256.New, key)
+	// mac.Write([]byte(sid))
+
+	// // to hex
+	// // signedMac := fmt.Sprintf("%x", mac.Sum(nil))
+
+	// // to base64
+	// signedMac := base64.StdEncoding.EncodeToString(mac.Sum(nil))
+
+	// return signedMac + "|" + sid
 }
 
 func parseToken(ss string) (string, error) {
