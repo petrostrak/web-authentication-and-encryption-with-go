@@ -24,16 +24,50 @@ type customClaims struct {
 }
 
 var (
-	db       = map[string]user{}
-	key      = []byte("mySecretKey")
+	// key is email, value is user
+	db = map[string]user{}
+	// key is sessionid, value is email
 	sessions = map[string]string{}
+	key      = []byte("mySecretKey")
 )
 
 func main() {
 	http.HandleFunc("/", index)
 	http.HandleFunc("/register", register)
 	http.HandleFunc("/login", login)
+	http.HandleFunc("/logout", logout)
 	http.ListenAndServe(":8080", nil)
+}
+
+func logout(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	c, err := r.Cookie("sessionID")
+	if err != nil {
+		c = &http.Cookie{
+			Name:  "sessionID",
+			Value: "",
+		}
+	}
+
+	sID, err := parseToken(c.Value)
+	if err != nil {
+		log.Println("index parseToken", err)
+	}
+
+	// remove the session
+	delete(sessions, sID)
+
+	// remove cookie
+	c.MaxAge = -1
+
+	http.SetCookie(w, c)
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+
 }
 
 func index(w http.ResponseWriter, r *http.Request) {
@@ -86,12 +120,16 @@ func index(w http.ResponseWriter, r *http.Request) {
 		</form>
 		<p>LOG IN</p>
 		<form action="/login" method="POST">
-		<label for="email">Email</label>
-		<input type="email" name="email" placeholder="Email"/>
-		<label for="password">Password</label>
-		<input type="password" name="password" placeholder="Password"/>
-		<input type="submit"/>
-	</form>
+			<label for="email">Email</label>
+			<input type="email" name="email" placeholder="Email"/>
+			<label for="password">Password</label>
+			<input type="password" name="password" placeholder="Password"/>
+			<input type="submit"/>
+		</form>
+		<p>LOG OUT</p>
+		<form action="/logout" method="POST">
+			<input type="submit" value="Logout"/>
+		</form>
 	</body>
 	</html>`, first, email, msg)
 }
