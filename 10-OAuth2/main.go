@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -11,6 +12,15 @@ import (
 	"golang.org/x/oauth2/github"
 )
 
+// JSON layout {"data":{"viewer":{"id":"SomeStringID..."}}}
+type githubResponse struct {
+	Data struct {
+		Viewer struct {
+			ID string `json:"id"`
+		} `json:"viewer"`
+	} `json:"data"`
+}
+
 var (
 	// First we create our oauth2 struct
 	githubOauthConfig = &oauth2.Config{
@@ -19,6 +29,9 @@ var (
 		Endpoint:     github.Endpoint,
 		RedirectURL:  "http://localhost:8080/oauth2/receive",
 	}
+
+	// Key is githubID, value is user ID
+	githubConnections map[string]string
 )
 
 func main() {
@@ -92,5 +105,24 @@ func completeGithubOauth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Github response with:
+	// {"data":{"viewer":{"id":"SomeStringID..."}}}
+	// At this point, we need to unmarshal this json.
 	log.Println(string(bs))
+
+	var gr githubResponse
+	if err := json.NewDecoder(resp.Body).Decode(&gr); err != nil {
+		http.Error(w, "github invalid response", http.StatusInternalServerError)
+		return
+	}
+
+	// After we decode our id, we would need to store it in DB
+	githubID := gr.Data.Viewer.ID
+	userID, ok := githubConnections[githubID]
+	if !ok {
+		// New User, create account
+	}
+
+	// Login to account userID using JWT
+	fmt.Println(userID)
 }
