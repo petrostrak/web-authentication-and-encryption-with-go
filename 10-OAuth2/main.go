@@ -3,6 +3,19 @@ package main
 import (
 	"fmt"
 	"net/http"
+
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/github"
+)
+
+var (
+	// First we create our oauth2 struct
+	githubOauthConfig = &oauth2.Config{
+		ClientID:     "",
+		ClientSecret: "",
+		Endpoint:     github.Endpoint,
+		RedirectURL:  "http://localhost:8080/oauth2/receive",
+	}
 )
 
 func main() {
@@ -29,6 +42,12 @@ func index(w http.ResponseWriter, r *http.Request) {
 }
 
 // startGithubOauth starts the oauth2 process
+//
+// This will redirect to github and will redirect to localhost:8080/oauth2/receive
+// with a code query and a state. The code query is needed from the server to create
+// the token. The state is a token to protect the user from CSRF attacks and is passed
+// in githubOauthConfig.AuthCodeURL("0000")
 func startGithubOauth(w http.ResponseWriter, r *http.Request) {
-
+	redirectURL := githubOauthConfig.AuthCodeURL("0000")
+	http.Redirect(w, r, redirectURL, http.StatusSeeOther)
 }
