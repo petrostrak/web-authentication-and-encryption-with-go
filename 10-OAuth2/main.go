@@ -2,7 +2,10 @@ package main
 
 import (
 	"fmt"
+	"io/ioutil"
+	"log"
 	"net/http"
+	"strings"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/github"
@@ -73,4 +76,21 @@ func completeGithubOauth(w http.ResponseWriter, r *http.Request) {
 	tokenSource := githubOauthConfig.TokenSource(r.Context(), token)
 	client := oauth2.NewClient(r.Context(), tokenSource)
 
+	// We make a post request to GraphQL with the following request body,
+	// we are looking for the viewers id
+	requestBody := strings.NewReader(`{"query": "query {viewer {id}}"}`)
+	resp, err := client.Post("https://api.github.com/graphql", "application/json", requestBody)
+	if err != nil {
+		http.Error(w, "couldn't get user", http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
+
+	bs, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		http.Error(w, "couldn't read github info", http.StatusInternalServerError)
+		return
+	}
+
+	log.Println(string(bs))
 }
