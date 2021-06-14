@@ -3,6 +3,8 @@ package main
 import (
 	"errors"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
@@ -47,8 +49,67 @@ func main() {
 	http.HandleFunc("/register", register)
 	http.HandleFunc("/login", login)
 	http.HandleFunc("/oauth/amazon/login", oAmazonLogin)
+	// This is our redirectURL "http://localhost:8080/oauth/amazon/receive"
+	http.HandleFunc("/oauth/amazon/receive", oAmazonReceive)
 	http.HandleFunc("/logout", logout)
 	http.ListenAndServe(":8080", nil)
+}
+
+func oAmazonReceive(w http.ResponseWriter, r *http.Request) {
+	state := r.FormValue("state")
+	if state == "" {
+		msg := url.QueryEscape("state was empty in oAmazonReceive")
+		http.Redirect(w, r, "/?errormsg="+msg, http.StatusSeeOther)
+		return
+	}
+
+	code := r.FormValue("code")
+	if code == "" {
+		msg := url.QueryEscape("code was empty in oAmazonReceive")
+		http.Redirect(w, r, "/?errormsg="+msg, http.StatusSeeOther)
+		return
+	}
+
+	expT := oauthExp[state]
+	if time.Now().After(expT) {
+		msg := url.QueryEscape("oauth took too long time.now.after")
+		http.Redirect(w, r, "/?errormsg="+msg, http.StatusSeeOther)
+		return
+	}
+
+	// Exchange our code for a token. This uses the client secret also
+	// The TokenURL is called and we get back a token
+	t, err := oauth.Exchange(r.Context(), code)
+	if err != nil {
+		msg := url.QueryEscape("couldn't do oauth exchange " + err.Error())
+		http.Redirect(w, r, "/?errormsg="+msg, http.StatusSeeOther)
+		return
+	}
+
+	tokenSource := oauth.TokenSource(r.Context(), t)
+	client := oauth2.NewClient(r.Context(), tokenSource)
+
+	resp, err := client.Get("https://amazon.com/user/profile")
+	if err != nil {
+		http.Error(w, "couldn't get profile", http.StatusInternalServerError)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		http.Error(w, "not a 200 resp status code", http.StatusInternalServerError)
+		return
+	}
+
+	fmt.Println(resp)
+	bs, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		http.Error(w, "couldn't read amazon info", http.StatusInternalServerError)
+		return
+	}
+
+	io.WriteString(w, string(bs))
+
 }
 
 func oAmazonLogin(w http.ResponseWriter, r *http.Request) {
