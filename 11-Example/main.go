@@ -353,6 +353,7 @@ func createSession(email string, w http.ResponseWriter) error {
 	c := http.Cookie{
 		Name:  "sessionID",
 		Value: token,
+		Path:  "/",
 	}
 
 	http.SetCookie(w, &c)
