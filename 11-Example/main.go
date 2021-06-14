@@ -1,10 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
@@ -27,6 +26,12 @@ type customClaims struct {
 	SID string
 }
 
+type amazonResponse struct {
+	Email  string `json:"email"`
+	Name   string `json:"name"`
+	UserID string `json:"user_id"`
+}
+
 var (
 	// key is email, value is user
 	db = map[string]user{}
@@ -34,8 +39,10 @@ var (
 	sessions = map[string]string{}
 	// key is uuid from oauth login, value is expiretion time
 	oauthExp = map[string]time.Time{}
-	key      = []byte("mySecretKey")
-	oauth    = &oauth2.Config{
+	// key is amazonID, value is email
+	amazonConnetions = map[string]string{}
+	key              = []byte("mySecretKey")
+	oauth            = &oauth2.Config{
 		ClientID:     "",
 		ClientSecret: "",
 		Endpoint:     amazon.Endpoint,
@@ -101,15 +108,25 @@ func oAmazonReceive(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println(resp)
-	bs, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		http.Error(w, "couldn't read amazon info", http.StatusInternalServerError)
+	// fmt.Println(resp)
+	// bs, err := ioutil.ReadAll(resp.Body)
+	// if err != nil {
+	// 	http.Error(w, "couldn't read amazon info", http.StatusInternalServerError)
+	// 	return
+	// }
+
+	var ar amazonResponse
+	if err := json.NewDecoder(resp.Body).Decode(&ar); err != nil {
+		http.Error(w, "amazon invalid response", http.StatusSeeOther)
 		return
 	}
 
-	io.WriteString(w, string(bs))
+	userID, ok := amazonConnetions[ar.UserID]
+	if !ok {
+		// Register at our site with amazon
+	}
 
+	fmt.Println(userID)
 }
 
 func oAmazonLogin(w http.ResponseWriter, r *http.Request) {
