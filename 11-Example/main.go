@@ -59,8 +59,62 @@ func main() {
 	// This is our redirectURL "http://localhost:8080/oauth/amazon/receive"
 	http.HandleFunc("/oauth/amazon/receive", oAmazonReceive)
 	http.HandleFunc("/partial-register", partialRegister)
+	http.HandleFunc("//oauth/amazon/register", amazonRegister)
 	http.HandleFunc("/logout", logout)
 	http.ListenAndServe(":8080", nil)
+}
+
+func amazonRegister(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != http.MethodPost {
+		msg := url.QueryEscape("your methor was not post")
+		http.Redirect(w, r, "/?errormsg="+msg, http.StatusSeeOther)
+		return
+	}
+
+	f := r.FormValue("first")
+	if f == "" {
+		msg := url.QueryEscape("your first name needs not to be empty")
+		http.Redirect(w, r, "/?errormsg="+msg, http.StatusSeeOther)
+		return
+	}
+
+	email := r.FormValue("email")
+	if email == "" {
+		msg := url.QueryEscape("your email needs not to be empty")
+		http.Redirect(w, r, "/?errormsg="+msg, http.StatusSeeOther)
+		return
+	}
+
+	oauthID := r.FormValue("oauthID")
+	if oauthID == "" {
+		msg := url.QueryEscape("oauthID came through as empty")
+		http.Redirect(w, r, "/?errormsg="+msg, http.StatusSeeOther)
+		return
+	}
+
+	amazonUserID, err := parseToken(oauthID)
+	if err != nil {
+		log.Println("parseToken in oAmazonRegister didn't parse")
+		msg := url.QueryEscape("there was an issue")
+		http.Redirect(w, r, "/?errormsg="+msg, http.StatusSeeOther)
+		return
+	}
+
+	db[email] = user{
+		First: f,
+	}
+
+	amazonConnetions[amazonUserID] = email
+
+	if err := createSession(email, w); err != nil {
+		log.Println("couldn't createSession in amazonRegister")
+		msg := url.QueryEscape("there was an issue")
+		http.Redirect(w, r, "/?errormsg="+msg, http.StatusSeeOther)
+		return
+	}
+
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func partialRegister(w http.ResponseWriter, r *http.Request) {
@@ -90,7 +144,7 @@ func partialRegister(w http.ResponseWriter, r *http.Request) {
 			<input type="text" name="first" placeholder="First" value="%s"/>
 			<label for="email">Email</label>
 			<input type="email" name="email" placeholder="Email" value="%s"/>
-			<input type="hidden" value="%s" name="oauthID"/>
+			<input type="hidden" name="oauthID" value="%s"/>
 			<input type="submit"/>
 		</form>
 	</body>
