@@ -121,12 +121,20 @@ func oAmazonReceive(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, ok := amazonConnetions[ar.UserID]
+	email, ok := amazonConnetions[ar.UserID]
 	if !ok {
 		// Register at our site with amazon
 	}
 
-	fmt.Println(userID)
+	if err := createSession(email, w); err != nil {
+		log.Println("couldn't createToken in oAmazonReceive", err)
+		msg := url.QueryEscape("try again later")
+		http.Redirect(w, r, "/?errormsg="+msg, http.StatusSeeOther)
+		return
+	}
+
+	msg := url.QueryEscape("you logged in " + email)
+	http.Redirect(w, r, "/?errormsg="+msg, http.StatusSeeOther)
 }
 
 func oAmazonLogin(w http.ResponseWriter, r *http.Request) {
@@ -323,14 +331,23 @@ func login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	sUUID := uuid.New().String()
-	sessions[sUUID] = email
-	token, err := createToken(sUUID)
-	if err != nil {
+	if err := createSession(email, w); err != nil {
 		log.Println("couldn't createToken in login", err)
 		msg := url.QueryEscape("try again later")
 		http.Redirect(w, r, "/?errormsg="+msg, http.StatusSeeOther)
 		return
+	}
+
+	msg := url.QueryEscape("you logged in " + email)
+	http.Redirect(w, r, "/?errormsg="+msg, http.StatusSeeOther)
+}
+
+func createSession(email string, w http.ResponseWriter) error {
+	sUUID := uuid.New().String()
+	sessions[sUUID] = email
+	token, err := createToken(sUUID)
+	if err != nil {
+		return fmt.Errorf("couldn't create token: %w", err)
 	}
 
 	c := http.Cookie{
@@ -340,8 +357,7 @@ func login(w http.ResponseWriter, r *http.Request) {
 
 	http.SetCookie(w, &c)
 
-	msg := url.QueryEscape("you logged in " + email)
-	http.Redirect(w, r, "/?errormsg="+msg, http.StatusSeeOther)
+	return nil
 }
 
 func createToken(sid string) (string, error) {
