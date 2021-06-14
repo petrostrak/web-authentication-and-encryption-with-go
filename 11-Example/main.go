@@ -64,7 +64,37 @@ func main() {
 }
 
 func partialRegister(w http.ResponseWriter, r *http.Request) {
+	sst := r.FormValue("signendToken")
+	name := r.FormValue("name")
+	email := r.FormValue("email")
 
+	if sst != "" {
+		log.Println("couldn't get signed token")
+		msg := url.QueryEscape("try again later")
+		http.Redirect(w, r, "/?errormsg="+msg, http.StatusSeeOther)
+		return
+	}
+
+	fmt.Fprintf(w, `<!DOCTYPE html>
+	<html lang="en">
+	<head>
+		<meta charset="UTF-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>Hands on exercises</title>
+	</head>
+	<body>
+		<p>REGISTER</p>
+		<form action="/oauth/amazon/register" method="POST">
+			<label for="first">First</label>
+			<input type="text" name="first" placeholder="First" value="%s"/>
+			<label for="email">Email</label>
+			<input type="email" name="email" placeholder="Email" value="%s"/>
+			<input type="hidden" value="%s" name="oauthID"/>
+			<input type="submit"/>
+		</form>
+	</body>
+	</html>`, name, email, sst)
 }
 
 func oAmazonReceive(w http.ResponseWriter, r *http.Request) {
