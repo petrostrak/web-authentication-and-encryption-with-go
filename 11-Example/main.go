@@ -58,8 +58,13 @@ func main() {
 	http.HandleFunc("/oauth/amazon/login", oAmazonLogin)
 	// This is our redirectURL "http://localhost:8080/oauth/amazon/receive"
 	http.HandleFunc("/oauth/amazon/receive", oAmazonReceive)
+	http.HandleFunc("/partial-register", partialRegister)
 	http.HandleFunc("/logout", logout)
 	http.ListenAndServe(":8080", nil)
+}
+
+func partialRegister(w http.ResponseWriter, r *http.Request) {
+
 }
 
 func oAmazonReceive(w http.ResponseWriter, r *http.Request) {
@@ -124,10 +129,24 @@ func oAmazonReceive(w http.ResponseWriter, r *http.Request) {
 	email, ok := amazonConnetions[ar.UserID]
 	if !ok {
 		// Register at our site with amazon
+		signendToken, err := createToken(ar.UserID)
+		if err != nil {
+			log.Println("couldn't createToken in oAmazonReceive", err)
+			msg := url.QueryEscape("try again later")
+			http.Redirect(w, r, "/?errormsg="+msg, http.StatusSeeOther)
+			return
+		}
+
+		uv := url.Values{}
+		uv.Add("sst", signendToken)
+		uv.Add("name", ar.Name)
+		uv.Add("email", ar.Email)
+		http.Redirect(w, r, "/partial-register?"+uv.Encode(), http.StatusSeeOther)
+		return
 	}
 
 	if err := createSession(email, w); err != nil {
-		log.Println("couldn't createToken in oAmazonReceive", err)
+		log.Println("couldn't createSession in oAmazonReceive", err)
 		msg := url.QueryEscape("try again later")
 		http.Redirect(w, r, "/?errormsg="+msg, http.StatusSeeOther)
 		return
