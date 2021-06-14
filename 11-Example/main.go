@@ -30,12 +30,15 @@ var (
 	db = map[string]user{}
 	// key is sessionid, value is email
 	sessions = map[string]string{}
+	// key is uuid from oauth login, value is expiretion time
+	oauthExp = map[string]time.Time{}
 	key      = []byte("mySecretKey")
 	oauth    = &oauth2.Config{
 		ClientID:     "",
 		ClientSecret: "",
 		Endpoint:     amazon.Endpoint,
-		RedirectURL:  "http://localhost:8080/oauth/receive",
+		RedirectURL:  "http://localhost:8080/oauth/amazon/receive",
+		Scopes:       []string{"profile"},
 	}
 )
 
@@ -43,9 +46,26 @@ func main() {
 	http.HandleFunc("/", index)
 	http.HandleFunc("/register", register)
 	http.HandleFunc("/login", login)
-	http.HandleFunc("/oauth/amazon/login", login)
+	http.HandleFunc("/oauth/amazon/login", oAmazonLogin)
 	http.HandleFunc("/logout", logout)
 	http.ListenAndServe(":8080", nil)
+}
+
+func oAmazonLogin(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != http.MethodPost {
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	id := uuid.New().String()
+	oauthExp[id] = time.Now().Add(time.Hour)
+
+	// oauth.AuthCodeURL besides the uuid that we create and pass in, it includes our ClientID. So
+	// amazon in this case knows how is making the request.
+	// This Redirect, goes from our site, to amazons and more specifically, to "https://www.amazon.com/ap/oa"
+	// which is declared in Endpoint.AuthURL
+	http.Redirect(w, r, oauth.AuthCodeURL(id), http.StatusSeeOther)
 }
 
 func logout(w http.ResponseWriter, r *http.Request) {
@@ -134,6 +154,10 @@ func index(w http.ResponseWriter, r *http.Request) {
 			<label for="password">Password</label>
 			<input type="password" name="password" placeholder="Password"/>
 			<input type="submit"/>
+		</form>
+		<p>LOG IN WITH AMAZON</p>
+		<form action="/oauth/amazon/login" method="POST">
+			<input type="submit" value="LOGIN WITH AMAZON"/>
 		</form>
 		<p>LOG OUT</p>
 		<form action="/logout" method="POST">
